@@ -1,6 +1,8 @@
+
 import 'package:flutter/material.dart';
 import 'package:gastoguard/screens/add_transaction_screen.dart';
 import 'package:gastoguard/screens/history_screen.dart';
+import 'package:gastoguard/services/budget_settings_scope.dart';
 import 'package:gastoguard/services/spending_summary.dart';
 import 'package:gastoguard/services/transaction_scope.dart';
 import 'package:gastoguard/services/transaction_store.dart';
@@ -17,8 +19,8 @@ import 'package:gastoguard/widgets/summary_stat_card.dart';
 /// The Spending Summary screen.
 ///
 /// It is worked out from the shared transaction list (only expenses count),
-/// so it updates by itself whenever a transaction is added. The Weekly and
-/// Monthly tabs change the period: see [SpendingSummary] for the details.
+/// so it updates whenever a transaction is added. The Weekly and Monthly
+/// tabs use the corresponding saved budget settings.
 class SpendingSummaryScreen extends StatefulWidget {
   const SpendingSummaryScreen({super.key, this.today});
 
@@ -33,8 +35,7 @@ class SpendingSummaryScreen extends StatefulWidget {
 class _SpendingSummaryScreenState extends State<SpendingSummaryScreen> {
   late final DateTime _today;
 
-  // Only used when there is no shared store above this screen (for example in
-  // the preview file): a private store with the sample transactions.
+  // Only used when there is no shared store above this screen.
   late final TransactionStore _fallbackStore =
       TransactionStore.withDemoData(_today);
 
@@ -49,13 +50,20 @@ class _SpendingSummaryScreenState extends State<SpendingSummaryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // The shared store. Asking for it here makes this screen redraw whenever
-    // a transaction is added.
+    // Shared transaction and budget stores.
+    // maybeOf makes the screen rebuild when either store changes.
     final store = TransactionScope.maybeOf(context) ?? _fallbackStore;
+    final budgetStore = BudgetSettingsScope.maybeOf(context);
+
+    final budgetLimit = _period == SummaryPeriod.weekly
+        ? budgetStore?.weeklyLimit ?? SpendingSummary.weeklyBudgetLimit
+        : budgetStore?.monthlyLimit ?? SpendingSummary.monthlyBudgetLimit;
+
     final summary = SpendingSummary.fromTransactions(
       store.transactions,
       period: _period,
       today: _today,
+      budgetLimit: budgetLimit,
     );
 
     // The chart is taller on tall screens, but never too small or too big.
@@ -181,18 +189,14 @@ class _SpendingSummaryScreenState extends State<SpendingSummaryScreen> {
         currentIndex: AppBottomNav.summaryIndex,
         onTap: (index) {
           if (index == AppBottomNav.homeIndex) {
-            // Go back to the Dashboard, the first screen of the app.
             Navigator.of(context).popUntil((route) => route.isFirst);
           } else if (index == AppBottomNav.addIndex) {
-            // Add Transaction opens on top, so its back arrow returns here.
             Navigator.of(context).push(
               MaterialPageRoute<void>(
                 builder: (_) => const AddTransactionScreen(),
               ),
             );
           } else if (index == AppBottomNav.historyIndex) {
-            // Swap this screen for History, so the back arrow of History
-            // still goes straight to the Dashboard.
             Navigator.of(context).pushReplacement(
               MaterialPageRoute<void>(builder: (_) => const HistoryScreen()),
             );
@@ -216,8 +220,6 @@ class _Header extends StatelessWidget {
           IconButton(
             tooltip: 'Back',
             onPressed: () {
-              // Closes this screen and reveals the Dashboard underneath, so
-              // there is never a second copy of the Dashboard.
               Navigator.of(context).maybePop();
             },
             icon: const Icon(
@@ -245,12 +247,10 @@ class _Header extends StatelessWidget {
   }
 }
 
-/// The white card under "Top Category": the category's icon, its name, how
-/// much was spent in it, and a bar showing its share of all the spending.
+/// The white card under "Top Category".
 class _TopCategoryCard extends StatelessWidget {
   const _TopCategoryCard({required this.topCategory});
 
-  /// null when nothing was spent in the period.
   final TopCategory? topCategory;
 
   @override
@@ -283,8 +283,6 @@ class _TopCategoryCard extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
-                    // "stretch" makes the bar as wide as the card, so its
-                    // white track is always full width.
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     mainAxisSize: MainAxisSize.min,
                     children: [

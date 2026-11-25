@@ -1,28 +1,107 @@
+
 import 'package:flutter/material.dart';
 import 'package:gastoguard/models/transaction_entry.dart';
+import 'package:gastoguard/screens/add_transaction_screen.dart';
+import 'package:gastoguard/services/transaction_scope.dart';
 import 'package:gastoguard/theme/app_colors.dart';
 import 'package:gastoguard/utils/currency_formatter.dart';
 import 'package:gastoguard/utils/date_formatter.dart';
 import 'package:gastoguard/widgets/category_icon_tile.dart';
 
-/// One row in the transaction history: category icon, category name,
-/// date and time, and the amount (red for expenses, green for income).
 class TransactionTile extends StatelessWidget {
-  const TransactionTile({super.key, required this.transaction});
+  const TransactionTile({
+    super.key,
+    required this.transaction,
+  });
 
   final TransactionEntry transaction;
+
+  Future<void> _edit(BuildContext context) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => AddTransactionScreen(
+          transaction: transaction,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _delete(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Delete Transaction?'),
+          content: const Text(
+            'Are you sure you want to delete this transaction? '
+            'This action cannot be undone.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.expense,
+              ),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    final store = TransactionScope.maybeRead(context);
+
+    if (store == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not delete transaction.'),
+        ),
+      );
+      return;
+    }
+
+    try {
+      await store.deleteTransactionAndSave(transaction.id);
+
+      if (!context.mounted) return;
+
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Transaction deleted'),
+          ),
+        );
+    } catch (_) {
+      if (!context.mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not delete transaction. Please try again.'),
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final isExpense = transaction.isExpense;
+
     final amountText = isExpense
-        ? formatPeso(-transaction.amount) // -₱150.00
-        : '+${formatPeso(transaction.amount)}'; // +₱1,000.00
-    final amountColor = isExpense ? AppColors.expense : AppColors.primaryDark;
+        ? formatPeso(-transaction.amount)
+        : '+${formatPeso(transaction.amount)}';
+
+    final amountColor =
+        isExpense ? AppColors.expense : AppColors.primaryDark;
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        // A smaller icon tile on narrow phones leaves more room for the text.
         final compact = constraints.maxWidth < 300;
 
         return Padding(
@@ -55,13 +134,25 @@ class TransactionTile extends StatelessWidget {
                         fontSize: 14,
                       ),
                     ),
+                    if (transaction.note != null &&
+                        transaction.note!.trim().isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        transaction.note!,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.textHint,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              // The amount shrinks a little if it is very long.
+              const SizedBox(width: 4),
               ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 110),
+                constraints: const BoxConstraints(maxWidth: 100),
                 child: FittedBox(
                   fit: BoxFit.scaleDown,
                   alignment: Alignment.centerRight,
@@ -74,6 +165,46 @@ class TransactionTile extends StatelessWidget {
                     ),
                   ),
                 ),
+              ),
+              PopupMenuButton<String>(
+                tooltip: 'Transaction options',
+                icon: const Icon(
+                  Icons.more_vert,
+                  color: AppColors.textHint,
+                ),
+                onSelected: (value) {
+                  if (value == 'edit') {
+                    _edit(context);
+                  } else if (value == 'delete') {
+                    _delete(context);
+                  }
+                },
+                itemBuilder: (context) => const [
+                  PopupMenuItem(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit_outlined, size: 20),
+                        SizedBox(width: 10),
+                        Text('Edit'),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.delete_outline,
+                          size: 20,
+                          color: AppColors.expense,
+                        ),
+                        SizedBox(width: 10),
+                        Text('Delete'),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

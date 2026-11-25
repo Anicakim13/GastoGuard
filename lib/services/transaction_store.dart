@@ -1,35 +1,56 @@
+
 import 'package:flutter/foundation.dart';
 import 'package:gastoguard/models/transaction_category.dart';
 import 'package:gastoguard/models/transaction_entry.dart';
+import 'package:gastoguard/services/app_database.dart';
 import 'package:gastoguard/services/demo_transactions.dart';
 
-/// The one list of transactions shared by the whole app.
-///
-/// It only lives in memory: when the app is closed, everything is forgotten.
-/// (A database will replace this in a later phase.)
-///
-/// It is a [ChangeNotifier]: every time a transaction is added it
-/// "notifies" the screens that are showing the list, and they redraw
-/// themselves. That is how a new transaction appears in History by itself.
 class TransactionStore extends ChangeNotifier {
-  /// Creates a store, optionally starting with some [initial] transactions.
-  TransactionStore({List<TransactionEntry> initial = const []})
-      : _transactions = List.of(initial);
+  TransactionStore({
+    List<TransactionEntry> initial = const [],
+    this.persistToDatabase = false,
+  }) : _transactions = List.of(initial);
 
-  /// Creates a store that starts with the sample transactions, so History is
-  /// not empty while the app has no database yet.
   TransactionStore.withDemoData(DateTime today)
       : this(initial: buildDemoTransactions(today));
 
   final List<TransactionEntry> _transactions;
+
+  /// True only for the real app's SQLite-backed store.
+  final bool persistToDatabase;
+
   int _nextId = 1;
 
-  /// All transactions. This list cannot be changed directly; use
-  /// [addTransaction] so that the screens are told about the change.
-  List<TransactionEntry> get transactions => List.unmodifiable(_transactions);
+  List<TransactionEntry> get transactions =>
+      List.unmodifiable(_transactions);
 
-  /// Adds a new transaction and tells the screens.
-  /// Returns the transaction that was created.
+  Future<void> loadTransactions() async {
+    final db = await AppDatabase.instance.database;
+    final rows = await db.query(
+      'transactions',
+      orderBy: 'dateTime DESC',
+    );
+
+    _transactions
+      ..clear()
+      ..addAll(
+        rows.map(
+          (row) => TransactionEntry(
+            id: row['id'] as String,
+            category: TransactionCategory.all.firstWhere(
+              (category) => category.name == row['category'],
+            ),
+            amount: (row['amount'] as num).toDouble(),
+            isExpense: (row['isExpense'] as int) == 1,
+            dateTime: DateTime.parse(row['dateTime'] as String),
+            note: row['note'] as String?,
+          ),
+        ),
+      );
+
+    notifyListeners();
+  }
+
   TransactionEntry addTransaction({
     required TransactionCategory category,
     required double amount,
@@ -38,15 +59,186 @@ class TransactionStore extends ChangeNotifier {
     String? note,
   }) {
     final entry = TransactionEntry(
-      id: 'user-${_nextId++}',
+      id: 'user-${DateTime.now().microsecondsSinceEpoch}-${_nextId++}',
       category: category,
       amount: amount,
       isExpense: isExpense,
       dateTime: dateTime,
       note: note,
     );
+
     _transactions.add(entry);
     notifyListeners();
     return entry;
+  }
+
+  Future<TransactionEntry> addTransactionAndSave({
+    required TransactionCategory category,
+    required double amount,
+    required bool isExpense,
+    required DateTime dateTime,
+    String? note,
+  }) async {
+    if (!persistToDatabase) {
+      return addTransaction(
+        category: category,
+        amount: amount,
+        isExpense: isExpense,
+        dateTime: dateTime,
+        note: note,
+      );
+    }
+
+    final entry = addTransaction(
+      category: category,
+      amount: amount,
+      isExpense: isExpense,
+      dateTime: dateTime,
+      note: note,
+    );
+
+    try {
+      final db = await AppDatabase.instance.database;
+      await db.insert('transactions', {
+        'id': entry.id,
+        'category': entry.category.name,
+        'amount': entry.amount,
+        'isExpense': entry.isExpense ? 1 : 0,
+        'dateTime': entry.dateTime.toIso8601String(),
+        'note': entry.note,
+      });
+    } catch (_) {
+      _transactions.remove(entry);
+      notifyListeners();
+      rethrow;
+    }
+
+    return entry;
+  }
+
+  /// Updates an existing transaction in memory.
+  void updateTransaction({
+    required String id,
+    required TransactionCategory category,
+    required double amount,
+    required bool isExpense,
+    required DateTime dateTime,
+    String? note,
+  }) {
+    final index = _transactions.indexWhere((item) => item.id == id);
+
+    if (index == -1) {
+      throw StateError('Transaction not found');
+    }
+
+    _transactions[index] = TransactionEntry(
+      id: id,
+      category: category,
+      amount: amount,
+      isExpense: isExpense,
+      dateTime: dateTime,
+      note: note,
+    );
+
+    notifyListeners();
+  }
+
+  /// Updates an existing transaction and saves it to SQLite.
+  Future<void> updateTransactionAndSave({
+    required String id,
+    required TransactionCategory category,
+    required double amount,
+    required bool isExpense,
+    required DateTime dateTime,
+    String? note,
+  }) async {
+    if (!persistToDatabase) {
+      updateTransaction(
+        id: id,
+        category: category,
+        amount: amount,
+        isExpense: isExpense,
+        dateTime: dateTime,
+        note: note,
+      );
+      return;
+    }
+
+    final index = _transactions.indexWhere((item) => item.id == id);
+
+    if (index == -1) {
+      throw StateError('Transaction not found');
+    }
+
+    final db = await AppDatabase.instance.database;
+
+    final count = await db.update(
+      'transactions',
+      {
+        'category': category.name,
+        'amount': amount,
+        'isExpense': isExpense ? 1 : 0,
+        'dateTime': dateTime.toIso8601String(),
+        'note': note,
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+
+    if (count == 0) {
+      throw StateError('Transaction not found in database');
+    }
+
+    _transactions[index] = TransactionEntry(
+      id: id,
+      category: category,
+      amount: amount,
+      isExpense: isExpense,
+      dateTime: dateTime,
+      note: note,
+    );
+
+    notifyListeners();
+  }
+
+  /// Deletes an existing transaction from memory.
+  void deleteTransaction(String id) {
+    final index = _transactions.indexWhere((item) => item.id == id);
+
+    if (index == -1) {
+      throw StateError('Transaction not found');
+    }
+
+    _transactions.removeAt(index);
+    notifyListeners();
+  }
+
+  /// Deletes an existing transaction from SQLite and memory.
+  Future<void> deleteTransactionAndSave(String id) async {
+    if (!persistToDatabase) {
+      deleteTransaction(id);
+      return;
+    }
+
+    final index = _transactions.indexWhere((item) => item.id == id);
+
+    if (index == -1) {
+      throw StateError('Transaction not found');
+    }
+
+    final db = await AppDatabase.instance.database;
+
+    final count = await db.delete(
+      'transactions',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+
+    if (count == 0) {
+      throw StateError('Transaction not found in database');
+    }
+
+    _transactions.removeAt(index);
+    notifyListeners();
   }
 }
