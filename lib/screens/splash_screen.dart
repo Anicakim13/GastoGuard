@@ -25,7 +25,11 @@ class SplashScreen extends StatelessWidget {
             SizedBox(height: screenSize.height * 0.04),
 
             // 1. Logo (shield + wallet)
-            Image.asset('assets/images/logo.png', height: logoHeight),
+            Image.asset(
+  'assets/images/gastoguard_logo.png',
+  height: logoHeight,
+  filterQuality: FilterQuality.high,
+),
             const SizedBox(height: 16),
 
             // 2. App name and tagline

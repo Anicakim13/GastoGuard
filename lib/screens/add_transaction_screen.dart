@@ -3,11 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:gastoguard/models/transaction_category.dart';
 import 'package:gastoguard/models/transaction_entry.dart';
+import 'package:gastoguard/services/budget_alert_service.dart';
+import 'package:gastoguard/services/budget_settings_scope.dart';
 import 'package:gastoguard/services/transaction_scope.dart';
 import 'package:gastoguard/theme/app_colors.dart';
 import 'package:gastoguard/theme/app_layout.dart';
 import 'package:gastoguard/utils/amount_parser.dart';
+import 'package:gastoguard/utils/currency_formatter.dart';
 import 'package:gastoguard/widgets/app_text_field.dart';
+import 'package:gastoguard/widgets/budget_alert_dialog.dart';
 import 'package:gastoguard/widgets/category_card.dart';
 import 'package:gastoguard/widgets/date_field.dart';
 import 'package:gastoguard/widgets/form_section.dart';
@@ -40,6 +44,9 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _noteController = TextEditingController();
+
+  final BudgetAlertService _budgetAlertService =
+      const BudgetAlertService();
 
   int _typeIndex = 0;
   TransactionCategory? _selectedCategory;
@@ -81,6 +88,28 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     }
   }
 
+  
+
+
+Future<void> _showBudgetAlerts(List<BudgetAlert> alerts) async {
+  for (final alert in alerts) {
+    if (!mounted) return;
+
+    final message = alert.overspent > 0
+        ? 'You have exceeded your weekly budget by '
+            '${formatPeso(alert.overspent)}.'
+        : 'You have ${formatPeso(alert.remaining)} left.';
+
+    await showBudgetAlertDialog(
+      context,
+      alertMessage:
+          'You’ve reached ${alert.percent}% of your weekly budget.',
+      remainingMessage: message,
+    );
+  }
+}
+
+
   Future<void> _save() async {
     final amount = parseAmount(_amountController.text);
 
@@ -117,7 +146,12 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
     );
 
     final note = _noteController.text.trim();
+
     final store = TransactionScope.maybeRead(context);
+    final budgetStore = BudgetSettingsScope.maybeRead(context);
+
+    // Keep a snapshot before saving so we can detect a threshold crossing.
+    final previousTransactions = store?.transactions ?? [];
 
     try {
       if (store != null) {
@@ -153,18 +187,37 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
 
     if (!mounted) return;
 
-// Clear the form only after adding a new transaction.
-if (transaction == null) {
-  _amountController.clear();
-  _noteController.clear();
+    // Check alerts only after successfully adding a new expense.
+    if (transaction == null &&
+        _typeIndex == 0 &&
+        store != null &&
+        budgetStore != null) {
+      final alerts = _budgetAlertService.checkThresholds(
+        previousTransactions: previousTransactions,
+        currentTransactions: store.transactions,
+        today: DateTime.now(),
+        weeklyLimit: budgetStore.weeklyLimit,
+        alert80Enabled: budgetStore.alert80Enabled,
+        alert100Enabled: budgetStore.alert100Enabled,
+      );
 
-  setState(() {
-    _typeIndex = 0;
-    _selectedCategory = null;
-  });
-}
+      await _showBudgetAlerts(alerts);
 
-ScaffoldMessenger.of(context)
+      if (!mounted) return;
+    }
+
+    // Clear the form only after adding a new transaction.
+    if (transaction == null) {
+      _amountController.clear();
+      _noteController.clear();
+
+      setState(() {
+        _typeIndex = 0;
+        _selectedCategory = null;
+      });
+    }
+
+    ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
@@ -397,5 +450,3 @@ class _CategoryGrid extends StatelessWidget {
     );
   }
 }
-
-

@@ -5,11 +5,13 @@ import 'package:flutter/material.dart';
 import 'package:gastoguard/screens/about_screen.dart';
 import 'package:gastoguard/screens/add_transaction_screen.dart';
 import 'package:gastoguard/screens/budget_settings_screen.dart';
+import 'package:gastoguard/screens/edit_profile_screen.dart';
 import 'package:gastoguard/screens/help_support_screen.dart';
 import 'package:gastoguard/screens/history_screen.dart';
 import 'package:gastoguard/screens/spending_summary_screen.dart';
 import 'package:gastoguard/services/budget_settings_scope.dart';
 import 'package:gastoguard/services/dashboard_summary.dart';
+import 'package:gastoguard/services/profile_settings_scope.dart';
 import 'package:gastoguard/services/transaction_scope.dart';
 import 'package:gastoguard/theme/app_colors.dart';
 import 'package:gastoguard/theme/app_layout.dart';
@@ -24,7 +26,6 @@ import 'package:gastoguard/widgets/stat_card.dart';
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
 
-  static const String _userName = 'Renz';
   static const double _weeklyBudget = 1000;
 
   static const double _cardMargin = 22;
@@ -64,6 +65,14 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
+  void _openEditProfile(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const EditProfileScreen(),
+      ),
+    );
+  }
+
   void _openAbout(BuildContext context) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -88,10 +97,85 @@ class DashboardScreen extends StatelessWidget {
       );
   }
 
+
+  Future<void> _confirmDeleteData(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Delete All Data?'),
+          content: const Text(
+            'Are you sure you want to delete all your transactions? '
+            'This action cannot be undone.\n\n'
+            'Your budget settings, alert preferences, and profile '
+            'name will be kept.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop(false);
+              },
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop(true);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Delete Data'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    final store = TransactionScope.maybeRead(context);
+
+    if (store == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Unable to access transaction data.'),
+        ),
+      );
+      return;
+    }
+
+    try {
+      await store.deleteAllTransactionsAndSave();
+
+      if (!context.mounted) return;
+
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('All transactions have been deleted.'),
+          ),
+        );
+    } catch (_) {
+      if (!context.mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not delete transactions. Please try again.'),
+        ),
+      );
+    }
+  }
+
+
   @override
   Widget build(BuildContext context) {
     final store = TransactionScope.maybeOf(context);
     final budgetStore = BudgetSettingsScope.maybeOf(context);
+    final profileStore = ProfileSettingsScope.maybeOf(context);
+
+    final userName = profileStore?.displayName ?? 'User';
 
     final summary = store == null
         ? DashboardSummary.sample
@@ -102,12 +186,13 @@ class DashboardScreen extends StatelessWidget {
 
     return Scaffold(
       drawer: AppDrawer(
-        userName: _userName,
+        userName: userName,
+        onEditProfile: () => _openEditProfile(context),
         onBudgetSettings: () => _openBudgetSettings(context),
         onAbout: () => _openAbout(context),
         onHelpAndSupport: () => _openHelp(context),
         onDarkMode: () => _showComingSoon(context, 'Dark Mode'),
-        onDeleteData: () => _showComingSoon(context, 'Delete Data'),
+        onDeleteData: () => _confirmDeleteData(context),
       ),
       drawerScrimColor: const Color(0x1A000000),
       body: SafeArea(
@@ -122,7 +207,7 @@ class DashboardScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const _DashboardHeader(userName: _userName),
+                  _DashboardHeader(userName: userName),
                   const SizedBox(height: 12),
 
                   Padding(
@@ -242,6 +327,8 @@ class DashboardScreen extends StatelessWidget {
             _openHistory(context);
           } else if (index == AppBottomNav.summaryIndex) {
             _openSummary(context);
+          } else if (index == AppBottomNav.settingsIndex) {
+            _openBudgetSettings(context);
           }
         },
       ),

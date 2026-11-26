@@ -85,6 +85,49 @@ void main() {
       final store = TransactionStore.withDemoData(DateTime(2026, 11, 15));
       expect(store.transactions.length, 14);
     });
+
+
+    test('deletes all transactions and notifies listeners', () async {
+      final store = TransactionStore(
+        initial: [
+          TransactionEntry(
+            id: 'a',
+            category: TransactionCategory.food,
+            amount: 100,
+            isExpense: true,
+            dateTime: DateTime(2026, 11, 20),
+          ),
+          TransactionEntry(
+            id: 'b',
+            category: TransactionCategory.data,
+            amount: 50,
+            isExpense: false,
+            dateTime: DateTime(2026, 11, 21),
+          ),
+        ],
+      );
+
+      var calls = 0;
+      store.addListener(() => calls++);
+
+      await store.deleteAllTransactionsAndSave();
+
+      expect(store.transactions, isEmpty);
+      expect(calls, 1);
+
+      store.dispose();
+    });
+
+    test('deleting all transactions when empty stays empty', () async {
+      final store = TransactionStore();
+
+      await store.deleteAllTransactionsAndSave();
+
+      expect(store.transactions, isEmpty);
+
+      store.dispose();
+    });
+
   });
 
   group('parseAmount', () {

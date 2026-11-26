@@ -13,6 +13,7 @@ import 'package:gastoguard/widgets/app_dropdown.dart';
 import 'package:gastoguard/widgets/app_filter_chip.dart';
 import 'package:gastoguard/widgets/search_field.dart';
 import 'package:gastoguard/widgets/transaction_tile.dart';
+import 'package:gastoguard/screens/budget_settings_screen.dart';
 
 /// The Transaction History screen.
 ///
@@ -146,23 +147,25 @@ class _HistoryScreenState extends State<HistoryScreen> {
       // The same bottom bar as the Dashboard, with History selected.
       bottomNavigationBar: AppBottomNav(
         currentIndex: AppBottomNav.historyIndex,
-        onTap: (index) {
+                onTap: (index) {
           if (index == AppBottomNav.homeIndex) {
-            // Go back to the Dashboard, the first screen of the app.
             Navigator.of(context).popUntil((route) => route.isFirst);
           } else if (index == AppBottomNav.addIndex) {
-            // Add Transaction opens on top, so its back arrow returns here.
             Navigator.of(context).push(
               MaterialPageRoute<void>(
                 builder: (_) => const AddTransactionScreen(),
               ),
             );
           } else if (index == AppBottomNav.summaryIndex) {
-            // Swap this screen for the Spending Summary, so its back arrow
-            // still goes straight to the Dashboard.
             Navigator.of(context).pushReplacement(
               MaterialPageRoute<void>(
                 builder: (_) => const SpendingSummaryScreen(),
+              ),
+            );
+          } else if (index == AppBottomNav.settingsIndex) {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const BudgetSettingsScreen(),
               ),
             );
           }

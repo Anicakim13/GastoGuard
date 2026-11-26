@@ -1,11 +1,9 @@
+
 import 'package:flutter/material.dart';
 import 'package:gastoguard/theme/app_colors.dart';
 import 'package:gastoguard/theme/app_layout.dart';
 
-/// The bottom navigation bar: Home, Add, History, Summary.
-///
-/// The selected item's icon is green. Tapping an item calls [onTap] with the
-/// item's position (0 = Home, 1 = Add, 2 = History, 3 = Summary).
+/// Shared bottom navigation for the GastoGuard screens.
 class AppBottomNav extends StatelessWidget {
   const AppBottomNav({
     super.key,
@@ -13,57 +11,77 @@ class AppBottomNav extends StatelessWidget {
     required this.onTap,
   });
 
-  /// Which item is selected.
   final int currentIndex;
-
-  /// Called when an item is tapped.
   final ValueChanged<int> onTap;
 
-  // Positions of the items below. Screens use these names instead of bare
-  // numbers. Keep them in the same order as _items.
+  // Keep existing indexes unchanged.
   static const int homeIndex = 0;
   static const int addIndex = 1;
   static const int historyIndex = 2;
   static const int summaryIndex = 3;
+  static const int settingsIndex = 4;
 
+  // Visual order: Home, History, Add, Summary, Settings.
   static const List<_NavItem> _items = [
-    _NavItem(icon: Icons.home_rounded, label: 'Home'),
-    _NavItem(icon: Icons.add_circle_outline, label: 'Add'),
-    _NavItem(icon: Icons.history, label: 'History'),
-    _NavItem(icon: Icons.bar_chart_rounded, label: 'Summary'),
+    _NavItem(
+      index: homeIndex,
+      icon: Icons.home_rounded,
+      label: 'Home',
+    ),
+    _NavItem(
+      index: historyIndex,
+      icon: Icons.history_rounded,
+      label: 'History',
+    ),
+    _NavItem(
+      index: addIndex,
+      icon: Icons.add_rounded,
+      label: 'Add',
+      isAdd: true,
+    ),
+    _NavItem(
+      index: summaryIndex,
+      icon: Icons.bar_chart_rounded,
+      label: 'Summary',
+    ),
+    _NavItem(
+      index: settingsIndex,
+      icon: Icons.settings_rounded,
+      label: 'Settings',
+    ),
   ];
 
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
-      // The thin gray line above the bar
       decoration: const BoxDecoration(
-        border: Border(top: BorderSide(color: AppColors.navDivider)),
+        color: AppColors.surface,
+        border: Border(
+          top: BorderSide(color: AppColors.navDivider),
+        ),
       ),
       child: SafeArea(
         top: false,
         child: Center(
           heightFactor: 1,
           child: ConstrainedBox(
-            // Same maximum width as the Dashboard content (wide screens / web).
-            constraints:
-                const BoxConstraints(maxWidth: AppLayout.maxContentWidth),
-            child: FractionallySizedBox(
-              widthFactor: 0.8,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Row(
-                  children: [
-                    for (var i = 0; i < _items.length; i++)
-                      Expanded(
-                        child: _NavButton(
-                          item: _items[i],
-                          selected: i == currentIndex,
-                          onTap: () => onTap(i),
-                        ),
+            constraints: const BoxConstraints(
+              maxWidth: AppLayout.maxContentWidth,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(8, 14, 8, 5),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  for (final item in _items)
+                    Expanded(
+                      child: _NavButton(
+                        item: item,
+                        selected: item.index == currentIndex,
+                        onTap: () => onTap(item.index),
                       ),
-                  ],
-                ),
+                    ),
+                ],
               ),
             ),
           ),
@@ -73,12 +91,18 @@ class AppBottomNav extends StatelessWidget {
   }
 }
 
-/// The icon and label of one navigation item.
 class _NavItem {
-  const _NavItem({required this.icon, required this.label});
+  const _NavItem({
+    required this.index,
+    required this.icon,
+    required this.label,
+    this.isAdd = false,
+  });
 
+  final int index;
   final IconData icon;
   final String label;
+  final bool isAdd;
 }
 
 class _NavButton extends StatelessWidget {
@@ -94,25 +118,81 @@ class _NavButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (item.isAdd) {
+      return _buildAddButton();
+    }
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
+        padding: const EdgeInsets.symmetric(vertical: 3),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               item.icon,
-              size: 34,
-              color: selected ? AppColors.primary : AppColors.textPrimary,
+              size: 27,
+              color: selected
+                  ? AppColors.primary
+                  : AppColors.textPrimary,
             ),
-            const SizedBox(height: 2),
+            const SizedBox(height: 4),
             Text(
               item.label,
-              style: const TextStyle(
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: selected
+                    ? AppColors.primary
+                    : AppColors.textPrimary,
+                fontSize: 10,
+                fontWeight:
+                    selected ? FontWeight.w700 : FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAddButton() {
+    return InkWell(
+      onTap: onTap,
+      customBorder: const CircleBorder(),
+      child: Transform.translate(
+        offset: const Offset(0, -10),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 54,
+              height: 54,
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.20),
+                    blurRadius: 7,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.add_rounded,
+                color: AppColors.textOnGreen,
+                size: 34,
+              ),
+            ),
+            const SizedBox(height: 2),
+            const Text(
+              'Add',
+              style: TextStyle(
                 color: AppColors.textPrimary,
-                fontSize: 11,
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ],

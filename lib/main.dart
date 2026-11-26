@@ -6,6 +6,8 @@ import 'package:gastoguard/services/budget_settings_store.dart';
 import 'package:gastoguard/services/transaction_scope.dart';
 import 'package:gastoguard/services/transaction_store.dart';
 import 'package:gastoguard/theme/app_theme.dart';
+import 'package:gastoguard/services/profile_settings_scope.dart';
+import 'package:gastoguard/services/profile_settings_store.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,6 +31,7 @@ class GastoGuardApp extends StatefulWidget {
 class _GastoGuardAppState extends State<GastoGuardApp> {
   late final TransactionStore _store;
   late final BudgetSettingsStore _budgetStore;
+  late final ProfileSettingsStore _profileStore;
 
   bool _isReady = false;
   Object? _initializationError;
@@ -44,6 +47,10 @@ class _GastoGuardAppState extends State<GastoGuardApp> {
       persistToDatabase: _store.persistToDatabase,
     );
 
+    _profileStore = ProfileSettingsStore(
+      persistToDatabase: _store.persistToDatabase,
+    );
+
     if (_store.persistToDatabase) {
       _initializeApp();
     } else {
@@ -55,6 +62,7 @@ class _GastoGuardAppState extends State<GastoGuardApp> {
     try {
       await _store.loadTransactions();
       await _budgetStore.loadSettings();
+      await _profileStore.loadProfile();
     } catch (error) {
       _initializationError = error;
     }
@@ -70,6 +78,7 @@ class _GastoGuardAppState extends State<GastoGuardApp> {
   void dispose() {
     _store.dispose();
     _budgetStore.dispose();
+    _profileStore.dispose();
     super.dispose();
   }
 
@@ -101,18 +110,21 @@ class _GastoGuardAppState extends State<GastoGuardApp> {
         ),
       );
     }
-
+  
     return TransactionScope(
       store: _store,
       child: BudgetSettingsScope(
         store: _budgetStore,
-        child: MaterialApp(
-          title: 'GastoGuard',
-          debugShowCheckedModeBanner: false,
-          theme: AppTheme.light,
-          home: const SplashScreen(),
+        child: ProfileSettingsScope(
+          store: _profileStore,
+          child: MaterialApp(
+            title: 'GastoGuard',
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.light,
+            home: const SplashScreen(),
+          ),
         ),
       ),
     );
   }
-}
+}    

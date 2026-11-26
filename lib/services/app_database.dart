@@ -8,7 +8,7 @@ class AppDatabase {
   static final AppDatabase instance = AppDatabase._();
 
   static const String _databaseName = 'gastoguard.db';
-  static const int _databaseVersion = 2;
+  static const int _databaseVersion = 3;
 
   Database? _database;
 
@@ -34,10 +34,15 @@ class AppDatabase {
         ''');
 
         await _createBudgetSettingsTable(db);
+        await _createProfileSettingsTable(db);
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
           await _createBudgetSettingsTable(db);
+        }
+
+        if (oldVersion < 3) {
+          await _createProfileSettingsTable(db);
         }
       },
     );
@@ -62,6 +67,20 @@ class AppDatabase {
       'monthlyLimit': 4000.0,
       'alert80Enabled': 1,
       'alert100Enabled': 1,
+    });
+  }
+
+  Future<void> _createProfileSettingsTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE profile_settings (
+        id INTEGER PRIMARY KEY,
+        displayName TEXT NOT NULL DEFAULT 'User'
+      )
+    ''');
+
+    await db.insert('profile_settings', {
+      'id': 1,
+      'displayName': 'User',
     });
   }
 }

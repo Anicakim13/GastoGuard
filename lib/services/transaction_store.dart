@@ -241,4 +241,21 @@ class TransactionStore extends ChangeNotifier {
     _transactions.removeAt(index);
     notifyListeners();
   }
+
+
+  /// Deletes all transactions from SQLite and memory.
+  /// Budget settings and profile settings are not affected.
+  Future<void> deleteAllTransactionsAndSave() async {
+    if (persistToDatabase) {
+      final db = await AppDatabase.instance.database;
+
+      await db.transaction((txn) async {
+        await txn.delete('transactions');
+      });
+    }
+
+    _transactions.clear();
+    notifyListeners();
+  }
+
 }

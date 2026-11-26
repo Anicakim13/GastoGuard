@@ -254,7 +254,7 @@ class _BudgetSettingsScreenState extends State<BudgetSettingsScreen> {
       ),
 
       bottomNavigationBar: AppBottomNav(
-        currentIndex: AppBottomNav.summaryIndex,
+        currentIndex: AppBottomNav.settingsIndex,
         onTap: (index) {
           if (index == AppBottomNav.homeIndex) {
             Navigator.of(context).popUntil(

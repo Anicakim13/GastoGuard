@@ -15,6 +15,7 @@ import 'package:gastoguard/widgets/pill_toggle.dart';
 import 'package:gastoguard/widgets/share_progress_bar.dart';
 import 'package:gastoguard/widgets/spending_bar_chart.dart';
 import 'package:gastoguard/widgets/summary_stat_card.dart';
+import 'package:gastoguard/screens/budget_settings_screen.dart';
 
 /// The Spending Summary screen.
 ///
@@ -199,6 +200,13 @@ class _SpendingSummaryScreenState extends State<SpendingSummaryScreen> {
           } else if (index == AppBottomNav.historyIndex) {
             Navigator.of(context).pushReplacement(
               MaterialPageRoute<void>(builder: (_) => const HistoryScreen()),
+            );
+          }
+                    else if (index == AppBottomNav.settingsIndex) {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const BudgetSettingsScreen(),
+              ),
             );
           }
         },

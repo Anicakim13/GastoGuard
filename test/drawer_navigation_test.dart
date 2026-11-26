@@ -37,16 +37,16 @@ void main() {
     expect(find.byType(DashboardScreen, skipOffstage: false), findsOneWidget);
     expect(tester.element(find.byType(DashboardScreen)), same(original));
     expect(Navigator.of(original).canPop(), isFalse);
-    expect(find.text('Renz'), findsNothing); // the drawer is closed
+    expect(find.text('User'), findsNothing); // the drawer is closed
   }
 
   testWidgets('The menu icon opens the drawer', (WidgetTester tester) async {
     await pumpDashboard(tester);
-    expect(find.text('Renz'), findsNothing); // closed at first
+    expect(find.text('User'), findsNothing); // closed at first
 
     await openMenu(tester);
 
-    expect(find.text('Renz'), findsOneWidget);
+    expect(find.text('User'), findsOneWidget);
     expect(find.text('Track. Smart. Spent Better'), findsOneWidget);
     expect(find.text('Budget Settings'), findsOneWidget);
     expect(find.text('About GastoGuard'), findsOneWidget);
@@ -86,29 +86,29 @@ void main() {
     expectBackOnTheSameDashboard(tester, dashboard);
   });
 
-  testWidgets('Dark Mode and Delete Data only show a message',
+  
+  testWidgets('Dark Mode only shows a coming soon message',
       (WidgetTester tester) async {
     final dashboard = await pumpDashboard(tester);
 
-    // (Help & Support now opens its own screen; see
-    // help_support_screen_test.dart.)
-    for (final feature in ['Dark Mode', 'Delete Data']) {
-      await openMenu(tester);
-      await tester.tap(find.text(feature));
-      await tester.pumpAndSettle();
+    await openMenu(tester);
+    await tester.tap(find.text('Dark Mode'));
+    await tester.pumpAndSettle();
 
-      expect(find.text('$feature is coming soon'), findsOneWidget);
-      // No other screen opened, and the drawer is closed again.
-      expect(find.byType(BudgetSettingsScreen), findsNothing);
-      expect(find.byType(AboutScreen), findsNothing);
-      expectBackOnTheSameDashboard(tester, dashboard);
-    }
+    expect(find.text('Dark Mode is coming soon'), findsOneWidget);
+    expect(find.byType(BudgetSettingsScreen), findsNothing);
+    expect(find.byType(AboutScreen), findsNothing);
+    expectBackOnTheSameDashboard(tester, dashboard);
   });
 
-  testWidgets('Delete Data does not delete anything yet',
+
+  
+  testWidgets('Delete Data requires confirmation and deletes transactions',
       (WidgetTester tester) async {
     usePhoneScreen(tester);
+
     final store = TransactionStore.withDemoData(DateTime(2026, 11, 15));
+
     await tester.pumpWidget(
       TransactionScope(
         store: store,
@@ -118,29 +118,58 @@ void main() {
         ),
       ),
     );
-    expect(store.transactions.length, 14);
-    expect(find.text('₱3,000.00'), findsOneWidget); // the Income card
 
+    expect(store.transactions.length, 14);
+
+    // Open Delete Data confirmation.
     await openMenu(tester);
     await tester.tap(find.text('Delete Data'));
     await tester.pumpAndSettle();
 
-    // All 14 transactions are still there and the Dashboard is unchanged.
+    expect(find.text('Delete All Data?'), findsOneWidget);
+    expect(
+  find.textContaining(
+    'Your budget settings, alert preferences, and profile',
+  ),
+  findsOneWidget,
+);
     expect(store.transactions.length, 14);
-    expect(find.text('₱3,000.00'), findsOneWidget);
-    expect(find.text('₱1,465.00'), findsOneWidget); // the Spent card
+
+    // Cancel must preserve all transactions.
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
+    expect(store.transactions.length, 14);
+    expect(find.text('Delete All Data?'), findsNothing);
+
+    // Open again and confirm deletion.
+    await openMenu(tester);
+    await tester.tap(find.text('Delete Data'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.widgetWithText(ElevatedButton, 'Delete Data'),
+    );
+    await tester.pumpAndSettle();
+
+    expect(store.transactions, isEmpty);
+    expect(find.text('All transactions have been deleted.'),
+        findsOneWidget);
+    expect(find.text('Delete All Data?'), findsNothing);
+
+    store.dispose();
   });
 
   testWidgets('Tapping outside the drawer closes it',
       (WidgetTester tester) async {
     await pumpDashboard(tester);
     await openMenu(tester);
-    expect(find.text('Renz'), findsOneWidget);
+    expect(find.text('User'), findsOneWidget);
 
     await tester.tapAt(const Offset(380, 600)); // to the right of the drawer
     await tester.pumpAndSettle();
 
-    expect(find.text('Renz'), findsNothing);
+    expect(find.text('User'), findsNothing);
   });
 
   testWidgets('The drawer works in the real app, one screen after another',

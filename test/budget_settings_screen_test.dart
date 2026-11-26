@@ -100,7 +100,7 @@ void main() {
 
     // The bottom bar, with Summary highlighted like in the design.
     final nav = tester.widget<AppBottomNav>(find.byType(AppBottomNav));
-    expect(nav.currentIndex, AppBottomNav.summaryIndex);
+    expect(nav.currentIndex, AppBottomNav.settingsIndex);
   });
 
   testWidgets('The Weekly and Monthly tabs show their own budget',

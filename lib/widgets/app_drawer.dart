@@ -1,16 +1,14 @@
+
 import 'package:flutter/material.dart';
 import 'package:gastoguard/theme/app_colors.dart';
 
 /// The side menu that slides in from the left of the Dashboard.
-///
-/// It shows the profile (picture, name, tagline) and five menu items.
-/// Tapping an item closes the menu and then calls that item's callback, so
-/// the screen that owns the menu decides what happens next.
 class AppDrawer extends StatelessWidget {
   const AppDrawer({
     super.key,
     required this.userName,
     this.tagline = 'Track. Smart. Spent Better',
+    this.onEditProfile,
     required this.onBudgetSettings,
     required this.onAbout,
     required this.onHelpAndSupport,
@@ -18,12 +16,10 @@ class AppDrawer extends StatelessWidget {
     required this.onDeleteData,
   });
 
-  /// The name shown under the profile picture.
   final String userName;
-
-  /// The small line under the name.
   final String tagline;
 
+  final VoidCallback? onEditProfile;
   final VoidCallback onBudgetSettings;
   final VoidCallback onAbout;
   final VoidCallback onHelpAndSupport;
@@ -32,18 +28,17 @@ class AppDrawer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // About two thirds of the screen, like the Canva design, but never too
-    // narrow on a small phone or too wide in a big browser window.
     final width =
-        (MediaQuery.sizeOf(context).width * 0.67).clamp(250.0, 300.0).toDouble();
+        (MediaQuery.sizeOf(context).width * 0.67)
+            .clamp(250.0, 300.0)
+            .toDouble();
 
     return Drawer(
       width: width,
       backgroundColor: AppColors.surface,
-      surfaceTintColor: Colors.transparent, // no color tint over the white
-      shape: const RoundedRectangleBorder(), // square edge, like the design
+      surfaceTintColor: Colors.transparent,
+      shape: const RoundedRectangleBorder(),
       child: SafeArea(
-        // Scrolls on very short screens, so nothing can overflow.
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(vertical: 32),
           child: Column(
@@ -51,7 +46,6 @@ class AppDrawer extends StatelessWidget {
               const _Avatar(),
               const SizedBox(height: 20),
 
-              // Name and tagline shrink a little if they are very long.
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: FittedBox(
@@ -79,8 +73,13 @@ class AppDrawer extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 48),
+              const SizedBox(height: 32),
 
+              _DrawerItem(
+                icon: Icons.person_outline,
+                label: 'Edit Profile',
+                onTap: onEditProfile ?? () {},
+              ),
               _DrawerItem(
                 icon: Icons.settings_outlined,
                 label: 'Budget Settings',
@@ -114,7 +113,6 @@ class AppDrawer extends StatelessWidget {
   }
 }
 
-/// The round profile picture: a dark green circle with a light silhouette.
 class _Avatar extends StatelessWidget {
   const _Avatar();
 
@@ -127,8 +125,6 @@ class _Avatar extends StatelessWidget {
           width: 98,
           height: 98,
           color: AppColors.primaryDeep,
-          // The icon is a little too big and sits low, so the circle cuts
-          // off the shoulders, like in the design.
           alignment: const Alignment(0, 0.55),
           child: const Icon(
             Icons.person,
@@ -141,7 +137,6 @@ class _Avatar extends StatelessWidget {
   }
 }
 
-/// One menu row: an outlined icon and a bold label.
 class _DrawerItem extends StatelessWidget {
   const _DrawerItem({
     required this.icon,
@@ -157,14 +152,21 @@ class _DrawerItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: () {
-        Navigator.of(context).pop(); // close the menu first
+        Navigator.of(context).pop();
         onTap();
       },
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 15),
+        padding: const EdgeInsets.symmetric(
+          horizontal: 36,
+          vertical: 15,
+        ),
         child: Row(
           children: [
-            Icon(icon, size: 32, color: AppColors.textPrimary),
+            Icon(
+              icon,
+              size: 32,
+              color: AppColors.textPrimary,
+            ),
             const SizedBox(width: 24),
             Expanded(
               child: Text(
